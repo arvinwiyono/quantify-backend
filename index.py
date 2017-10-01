@@ -4,8 +4,10 @@ from sklearn.externals import joblib
 from flask import jsonify
 import sys
 import pandas as pd
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 df = pd.read_csv('./data/grouped-suburb-with-locations.csv')
 buy_scaler = joblib.load('./models/price/buy_scaler.pkl')
@@ -31,7 +33,7 @@ def get_suburb_data():
     geo_data = df[df.suburb == suburb]
     geo_data = geo_data[geo_data.property_type == prop_type]
     geo_data = geo_data[geo_data.num_bedrooms == num_bedrooms].iloc[0]
-    
+
     lat = geo_data.lat
     long = geo_data.lon
 
@@ -41,12 +43,16 @@ def get_suburb_data():
         dataset = dataset.append(pd.Series([lat, long, num_bedrooms, year, prop_type], index=columns), ignore_index=True)
     # tricking the dummies
     dataset = dataset.append(pd.Series([lat, long, 9999, num_bedrooms, 'HOUSE'], index=columns), ignore_index=True)
+    dataset = dataset.append(pd.Series([lat, long, 9999, num_bedrooms, 'APARTMENT'], index=columns), ignore_index=True)
 
     dataset = pd.concat([dataset, pd.get_dummies(dataset.property_type, prefix='prop_type')], axis=1)
     dataset = dataset.drop(['property_type', 'prop_type_APARTMENT'], axis=1)
-
-    buy_x = buy_scaler.transform(dataset)
-    rent_x = rent_scaler.transform(dataset)
+    print(dataset, file=sys.stderr)
+    print('**********', file=sys.stderr)
+    buy_x = buy_scaler.transform(dataset.iloc[:-2])
+    print(buy_x, file=sys.stderr)
+    print('**********', file=sys.stderr)
+    rent_x = rent_scaler.transform(dataset.iloc[:-2])
 
     predicted_price = buy_predictor.predict(buy_x)
     for i, p in enumerate(predicted_price):
